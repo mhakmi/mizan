@@ -1,0 +1,35 @@
+# Copy this file to .github/workflows/prompt-check.yml in your repository.
+#
+# It expects mizan.toml at the root of the repository. If yours is elsewhere,
+# change the paths below and add --config to the run line.
+
+name: Prompt check
+
+on:
+  pull_request:
+    paths:
+      - "prompts/**"
+      - "cases.toml"
+      - "mizan.toml"
+      - "mizan.baseline.json"
+
+permissions:
+  contents: read
+
+jobs:
+  mizan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+      # Pin a release tag. A floating version can change the result of the check.
+      # GitHub does not pass secrets to pull requests from forks, so the check
+      # cannot reach the model there.
+      - run: uvx --from "git+https://github.com/mhakmi/mizan@v0.1.0" mizan run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: mizan-report
+          path: mizan-report.json
