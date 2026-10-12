@@ -1,0 +1,31 @@
+[project]
+name = "mizan"
+version = "0.1.0"
+description = "Run a dataset against a prompt, score the answers, and fail the build when quality drops or the prompt goes over its token budget."
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mohammed Hakmi" }]
+dependencies = [
+    "jsonschema>=4.20",
+    "pydantic>=2.7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mizan"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
