@@ -1,0 +1,243 @@
+import json
+
+import pytest
+
+from mizan.files import load_project, write_baseline, write_report
+from mizan.types import (
+    AssertionScore,
+    Baseline,
+    ConfigError,
+    Contains,
+    FakeModel,
+    Incomplete,
+    Report,
+    RunSummary,
+    Scored,
+)
+
+CONFIG = """\
+dataset = "cases.toml"
+
+[prompt]
+system = "prompts/system.md"
+user = "prompts/user.md"
+
+[model]
+provider = "fake"
+replies = "fake/model.toml"
+
+[gate]
+min_score = 0.8
+max_prompt_tokens = 400
+
+[[assert]]
+type = "contains"
+value = "{{must_include}}"
+"""
+
+CASES = """\
+[[case]]
+id = "late-return"
+question = "Can I return boots after 40 days?"
+must_include = "30 days"
+
+[[case]]
+id = "damaged-item"
+question = "My tent arrived torn."
+must_include = "replace"
+"""
+
+
+@pytest.fixture
+def project_dir(tmp_path):
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "mizan.toml").write_text(CONFIG)
+    (tmp_path / "cases.toml").write_text(CASES)
+    (tmp_path / "prompts" / "system.md").write_text("You answer for a shop.\n")
+    (tmp_path / "prompts" / "user.md").write_text("Customer message:\n\n{{question}}\n")
+    return tmp_path
+
+
+def test_a_project_loads_with_its_prompts_rendered_into_each_case(project_dir):
+    project = load_project(project_dir / "mizan.toml")
+
+    assert [case.id for case in project.cases] == ["late-return", "damaged-item"]
+    assert project.cases[0].prompt.system == "You answer for a shop.\n"
+    assert (
+        project.cases[0].prompt.user == "Customer message:\n\nCan I return boots after 40 days?\n"
+    )
+    assert project.cases[1].assertions == (Contains(type="contains", value="replace"),)
+    assert project.config.model == FakeModel(provider="fake", replies="fake/model.toml")
+    assert project.config.gate.max_prompt_tokens == 400
+
+
+def test_paths_in_the_config_are_relative_to_the_config_file(project_dir):
+    project = load_project(project_dir / "mizan.toml")
+
+    assert project.base_dir == project_dir
+    assert project.baseline_path == project_dir / "mizan.baseline.json"
+    assert project.report_path == project_dir / "mizan-report.json"
+
+
+def test_a_project_with_no_baseline_file_has_no_baseline(project_dir):
+    assert load_project(project_dir / "mizan.toml").baseline is None
+
+
+def test_a_committed_baseline_is_loaded(project_dir):
+    (project_dir / "mizan.baseline.json").write_text(
+        '{"version": 1, "model": "fake:model.toml", "judge": null, "cases": {"late-return": 1.0}}'
+    )
+
+    assert load_project(project_dir / "mizan.toml").baseline == Baseline(
+        model="fake:model.toml", judge=None, cases={"late-return": 1.0}
+    )
+
+
+def test_a_system_prompt_override_replaces_the_configured_one(project_dir, tmp_path):
+    draft = tmp_path / "draft.md"
+    draft.write_text("You answer for a different shop.\n")
+
+    project = load_project(project_dir / "mizan.toml", system_prompt_override=draft)
+
+    assert project.cases[0].prompt.system == "You answer for a different shop.\n"
+    assert (
+        project.cases[0].prompt.user == "Customer message:\n\nCan I return boots after 40 days?\n"
+    )
+
+
+def rewrite(path, old, new):
+    text = path.read_text()
+    assert old in text
+    path.write_text(text.replace(old, new))
+
+
+def test_an_unknown_template_variable_stops_the_load_and_names_it(project_dir):
+    rewrite(project_dir / "prompts" / "user.md", "{{question}}", "{{qestion}}")
+
+    with pytest.raises(ConfigError, match='cases.toml: Case "late-return".*qestion'):
+        load_project(project_dir / "mizan.toml")
+
+
+def test_a_duplicate_case_id_stops_the_load(project_dir):
+    rewrite(project_dir / "cases.toml", 'id = "damaged-item"', 'id = "late-return"')
+
+    with pytest.raises(ConfigError, match='cases.toml: The case id "late-return" is used more'):
+        load_project(project_dir / "mizan.toml")
+
+
+def test_a_rubric_without_a_judge_stops_the_load(project_dir):
+    rewrite(
+        project_dir / "mizan.toml",
+        'type = "contains"\nvalue = "{{must_include}}"',
+        'type = "llm-rubric"\nrubric = "Mentions {{must_include}}."',
+    )
+
+    with pytest.raises(ConfigError, match=r"llm-rubric assertion, but the config has no \[judge\]"):
+        load_project(project_dir / "mizan.toml")
+
+
+def test_a_bad_regex_stops_the_load(project_dir):
+    rewrite(
+        project_dir / "mizan.toml",
+        'type = "contains"\nvalue = "{{must_include}}"',
+        'type = "regex"\npattern = "(unclosed"',
+    )
+
+    with pytest.raises(ConfigError, match="(?s)cases.toml.*not a valid regular expression"):
+        load_project(project_dir / "mizan.toml")
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "message"),
+    [
+        ('dataset = "cases.toml"', 'dataset = "missing.toml"', "Could not read .*missing.toml"),
+        ('dataset = "cases.toml"', 'dataset = "cases.toml', "mizan.toml is not valid TOML"),
+        ('dataset = "cases.toml"\n', "", "(?s)mizan.toml is not a valid config.*dataset"),
+        ("min_score = 0.8", "min_score = 80", "(?s)not a valid config.*gate.min_score"),
+        ("min_score = 0.8", "minimum = 0.8", "(?s)not a valid config.*gate.minimum"),
+        ('provider = "fake"', 'provider = "bedrock"', "(?s)not a valid config.*model"),
+        ('user = "prompts/user.md"', 'user = "prompts/gone.md"', "Could not read .*gone.md"),
+    ],
+    ids=[
+        "missing dataset",
+        "broken TOML",
+        "missing key",
+        "value out of range",
+        "unknown key",
+        "unknown provider",
+        "missing prompt file",
+    ],
+)
+def test_a_config_mistake_is_reported_with_the_file_and_the_key(project_dir, old, new, message):
+    rewrite(project_dir / "mizan.toml", old, new)
+
+    with pytest.raises(ConfigError, match=message):
+        load_project(project_dir / "mizan.toml")
+
+
+def test_a_broken_baseline_is_an_error_and_not_a_missing_baseline(project_dir):
+    (project_dir / "mizan.baseline.json").write_text('{"version": 1, "cases": ')
+
+    with pytest.raises(ConfigError, match="mizan.baseline.json is not a valid baseline"):
+        load_project(project_dir / "mizan.toml")
+
+
+def test_writing_the_same_baseline_twice_gives_the_same_bytes(tmp_path):
+    path = tmp_path / "mizan.baseline.json"
+    baseline = Baseline(
+        model="fake:model.toml", judge="fake:judge.toml", cases={"b": 0.8333, "a": 1.0}
+    )
+
+    write_baseline(path, baseline)
+    first = path.read_bytes()
+    write_baseline(path, baseline)
+
+    assert path.read_bytes() == first
+    assert first.endswith(b"}\n")
+    assert json.loads(first) == {
+        "version": 1,
+        "model": "fake:model.toml",
+        "judge": "fake:judge.toml",
+        "cases": {"b": 0.8333, "a": 1.0},
+    }
+    assert [entry.name for entry in tmp_path.iterdir()] == ["mizan.baseline.json"]
+
+
+def test_the_report_holds_the_full_output_of_each_case(tmp_path):
+    path = tmp_path / "mizan-report.json"
+    check = AssertionScore(
+        assertion=Contains(type="contains", value="30 days"),
+        score=0.0,
+        reason='The output does not contain "30 days".',
+    )
+    result = Scored(
+        case_id="late-return", output="Send them back any time.", prompt_tokens=152, checks=(check,)
+    )
+    summary = RunSummary(model="fake:model.toml", judge=None, results=(result,))
+
+    write_report(path, Report(verdict=Incomplete(), run=summary))
+
+    report = json.loads(path.read_text())
+    assert report["version"] == 1
+    assert report["verdict"] == {"status": "incomplete"}
+    assert report["run"]["results"] == [
+        {
+            "status": "scored",
+            "case_id": "late-return",
+            "output": "Send them back any time.",
+            "prompt_tokens": 152,
+            "checks": [
+                {
+                    "assertion": {
+                        "type": "contains",
+                        "value": "30 days",
+                        "ignore_case": False,
+                        "weight": 1.0,
+                    },
+                    "score": 0.0,
+                    "reason": 'The output does not contain "30 days".',
+                }
+            ],
+            "score": 0.0,
+        }
+    ]
