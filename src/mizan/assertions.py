@@ -1,5 +1,3 @@
-"""How one output is scored."""
-
 import json
 import re
 from typing import Any, assert_never
@@ -61,8 +59,7 @@ def check(
         case IsJson():
             score, reason = check_json(output, assertion.json_schema)
         case LlmRubric():
-            # The loader rejects a rubric when the config has no judge.
-            assert ask_judge is not None
+            assert ask_judge is not None, "load_project rejects a rubric with no judge"
             score, reason = grade(assertion.rubric, case, output, ask_judge)
         case _:
             assert_never(assertion)
@@ -110,12 +107,6 @@ def judge_prompt(case_input: str, output: str, rubric: str) -> Prompt:
 
 
 def parse_judge_reply(text: str) -> tuple[float, str]:
-    """Read the judge's JSON and return (score, reason).
-
-    Raises JudgeReplyError for a reply that cannot be read. An unreadable grade
-    is not a zero.
-    """
-    # From the first brace to the last, so a reply inside a code fence still parses.
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end < start:

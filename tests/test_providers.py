@@ -67,8 +67,6 @@ OPENAI_REPLY = {
 
 
 class CannedPost:
-    """Stands in for post_json. Returns one payload and keeps what it was sent."""
-
     def __init__(self, payload):
         self.payload = payload
         self.requests = []
@@ -270,8 +268,6 @@ def test_a_replies_file_with_a_mistake_is_rejected_with_the_file_named(tmp_path)
 
 
 class CannedHttp:
-    """Stands in for urllib.request.urlopen. Each call takes the next outcome."""
-
     def __init__(self, monkeypatch, *outcomes):
         self.outcomes = list(outcomes)
         self.sleeps = []

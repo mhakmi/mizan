@@ -12,7 +12,6 @@ EXAMPLE = Path(__file__).parent.parent / "examples" / "support-bot"
 
 @pytest.fixture
 def example(tmp_path):
-    # A report left behind by a manual run is not part of the example.
     without_report = shutil.ignore_patterns("mizan-report.json")
     return Path(shutil.copytree(EXAMPLE, tmp_path / "support-bot", ignore=without_report))
 
@@ -57,7 +56,6 @@ def test_removing_the_return_policy_fails_the_gate_on_quality(example, capsys):
     assert [failure["check"] for failure in verdict["failures"]] == ["min_score", "max_drop"]
     assert verdict["comparison"]["changes"]["late-return"] == {"baseline": 1.0, "current": 0.0}
 
-    # The score fell because the model gave a different answer to a different prompt.
     late_return = report(example)["run"]["results"][0]
     assert late_return["output"] == "Sure, you can send them back whenever you like."
     assert committed_files(example) == before

@@ -74,7 +74,7 @@ def test_a_project_loads_with_its_prompts_rendered_into_each_case(project_dir):
 def test_paths_in_the_config_are_relative_to_the_config_file(project_dir):
     project = load_project(project_dir / "mizan.toml")
 
-    assert project.base_dir == project_dir
+    assert project.config_dir == project_dir
     assert project.baseline_path == project_dir / "mizan.baseline.json"
     assert project.report_path == project_dir / "mizan-report.json"
 

@@ -1,5 +1,3 @@
-"""The models Mizan can call. The only module that touches the network."""
-
 import http.client
 import json
 import os
@@ -38,7 +36,7 @@ ANTHROPIC_VERSION = "2023-06-01"
 ANTHROPIC_DEFAULT_MAX_TOKENS = 4096
 
 
-def connect(settings: ModelSettings, base_dir: Path) -> Complete:
+def connect(settings: ModelSettings, config_dir: Path) -> Complete:
     """Return the function that calls the configured model.
 
     Raises ConfigError when the API key is not in the environment, so a missing
@@ -50,13 +48,12 @@ def connect(settings: ModelSettings, base_dir: Path) -> Complete:
         case OpenAIModel():
             return openai_model(settings, read_api_key(settings.api_key_env))
         case FakeModel():
-            return fake_model(load_fake_rules(base_dir / settings.replies))
+            return fake_model(load_fake_rules(config_dir / settings.replies))
         case _:
             assert_never(settings)
 
 
 def label(settings: ModelSettings) -> str:
-    """The name shown in output and stored in the baseline."""
     match settings:
         case AnthropicModel():
             return f"anthropic:{settings.name}"
@@ -76,11 +73,6 @@ def read_api_key(variable: str) -> str:
 
 
 def post_json(url: str, headers: Mapping[str, str], body: Mapping[str, Any]) -> dict[str, Any]:
-    """POST a JSON body and return the JSON reply.
-
-    Makes up to three attempts. An error message never includes the headers,
-    because they hold the API key.
-    """
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
@@ -125,7 +117,6 @@ class AnthropicMessage(BaseModel):
 
 
 def anthropic_model(settings: AnthropicModel, api_key: str, post: PostJson = post_json) -> Complete:
-    """Call the Anthropic Messages API."""
     url = settings.base_url.rstrip("/") + "/v1/messages"
     headers = {"x-api-key": api_key, "anthropic-version": ANTHROPIC_VERSION}
 
@@ -173,12 +164,10 @@ class OpenAIUsage(BaseModel):
 
 class OpenAICompletion(BaseModel):
     choices: list[OpenAIChoice] = Field(min_length=1)
-    # Required. If an endpoint left it out, the token budget would pass unmeasured.
     usage: OpenAIUsage
 
 
 def openai_model(settings: OpenAIModel, api_key: str, post: PostJson = post_json) -> Complete:
-    """Call any endpoint that speaks the OpenAI chat completions format."""
     url = settings.base_url.rstrip("/") + "/chat/completions"
     headers = {"authorization": f"Bearer {api_key}"}
 
@@ -203,7 +192,6 @@ def openai_model(settings: OpenAIModel, api_key: str, post: PostJson = post_json
 
 
 class FakeRule(Shape):
-    # Phrases that must all appear in the prompt. An empty list always matches.
     when: tuple[str, ...]
     text: str
 
@@ -220,18 +208,11 @@ def load_fake_rules(path: Path) -> tuple[FakeRule, ...]:
 
 
 def fake_model(rules: Sequence[FakeRule]) -> Complete:
-    """A model with scripted answers, for trying Mizan with no key and no network.
-
-    The first rule whose phrases all appear in the prompt gives the answer. The
-    token count is the number of words in the prompt.
-    """
-
     def complete(prompt: Prompt) -> Reply:
         searched = (prompt.system or "") + "\n" + prompt.user
         for rule in rules:
             if all(phrase in searched for phrase in rule.when):
                 return Reply(text=rule.text, prompt_tokens=len(searched.split()))
-        # A default answer here would hide a typo in the rules file.
         raise ProviderError(
             "No rule in the fake replies file matches this prompt. "
             'Add a [[reply]] table whose "when" phrases all appear in it.'

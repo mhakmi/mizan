@@ -39,7 +39,6 @@ def test_a_case_score_weighs_the_judge_grade_against_the_other_assertions():
 
     (result,) = run_cases((case,), complete=model, ask_judge=judge, concurrency=1)
 
-    # (2 * 0.5 + 1 * 1.0) / 3
     assert result.score == 0.6667
 
 

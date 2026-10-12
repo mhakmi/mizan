@@ -1,5 +1,3 @@
-"""Reading the user's files, and writing the baseline and the report."""
-
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,11 +11,8 @@ from mizan.types import Baseline, Case, Config, ConfigError, LlmRubric, Report, 
 
 @dataclass(frozen=True)
 class Project:
-    """Everything a run needs from disk, validated and with templates filled in."""
-
     config_path: Path
-    # The directory that holds the config. Every path in the config is relative to it.
-    base_dir: Path
+    config_dir: Path
     config: Config
     cases: tuple[Case, ...]
     baseline: Baseline | None
@@ -33,7 +28,7 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
 
     Raises ConfigError that names the file for anything that is wrong.
     """
-    base_dir = config_path.parent
+    config_dir = config_path.parent
     try:
         config = Config.model_validate(read_toml(config_path))
     except ValidationError as error:
@@ -43,15 +38,15 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
     if system_prompt_override is not None:
         system_template = read_text(system_prompt_override)
     elif config.prompt.system is not None:
-        system_template = read_text(base_dir / config.prompt.system)
-    user_template = read_text(base_dir / config.prompt.user)
+        system_template = read_text(config_dir / config.prompt.system)
+    user_template = read_text(config_dir / config.prompt.user)
 
-    dataset_path = base_dir / config.dataset
+    dataset_path = config_dir / config.dataset
     rows = read_toml(dataset_path).get("case", [])
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
         raise ConfigError(f"{dataset_path}: the cases must be [[case]] tables.")
     try:
-        cases = build_cases(rows, config.default_assertions, system_template, user_template)
+        cases = build_cases(rows, config.assertion_templates, system_template, user_template)
     except ConfigError as error:
         raise ConfigError(f"{dataset_path}: {error}") from error
 
@@ -64,15 +59,15 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
                         "but the config has no [judge] table."
                     )
 
-    baseline_path = base_dir / config.baseline
+    baseline_path = config_dir / config.baseline
     return Project(
         config_path=config_path,
-        base_dir=base_dir,
+        config_dir=config_dir,
         config=config,
         cases=cases,
         baseline=read_baseline(baseline_path),
         baseline_path=baseline_path,
-        report_path=base_dir / config.report,
+        report_path=config_dir / config.report,
     )
 
 
@@ -100,16 +95,15 @@ def read_baseline(path: Path) -> Baseline | None:
 
 
 def write_baseline(path: Path, baseline: Baseline) -> None:
-    """Write the baseline as indented JSON.
-
-    The file has no timestamp, so the same run written twice gives the same
-    bytes. It is written beside the target and renamed over it, so a crash
-    cannot leave half a baseline.
-    """
-    temporary_path = path.with_name(path.name + ".tmp")
-    temporary_path.write_text(baseline.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    temporary_path.replace(path)
+    write_whole_file(path, baseline.model_dump_json(indent=2) + "\n")
 
 
 def write_report(path: Path, report: Report) -> None:
-    path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    write_whole_file(path, report.model_dump_json(indent=2) + "\n")
+
+
+def write_whole_file(path: Path, text: str) -> None:
+    """Write beside the target and rename over it, so a crash cannot leave half a file."""
+    temporary_path = path.with_name(path.name + ".tmp")
+    temporary_path.write_text(text, encoding="utf-8")
+    temporary_path.replace(path)

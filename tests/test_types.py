@@ -28,7 +28,6 @@ def test_a_case_score_is_the_weighted_mean_of_its_assertion_scores():
         AssertionScore(assertion=contains, score=1.0, reason="Found."),
     )
 
-    # (2 * 0.25 + 1 * 1.0) / 3. A plain mean would give 0.625.
     assert result.score == 0.5
 
 

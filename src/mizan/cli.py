@@ -1,5 +1,3 @@
-"""The command line. Arguments in, exit code out."""
-
 import argparse
 import sys
 import traceback
@@ -72,11 +70,11 @@ def run_command(config_path: Path, system_prompt: Path | None, update_baseline: 
 
     project = load_project(config_path, system_prompt)
     config = project.config
-    complete = connect(config.model, project.base_dir)
+    complete = connect(config.model, project.config_dir)
     ask_judge = None
     judge_label = None
     if config.judge is not None:
-        ask_judge = connect(config.judge, project.base_dir)
+        ask_judge = connect(config.judge, project.config_dir)
         judge_label = label(config.judge)
 
     results = run_cases(project.cases, complete, ask_judge, config.concurrency)

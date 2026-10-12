@@ -1,5 +1,3 @@
-"""How a row in the dataset becomes a Case."""
-
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -8,7 +6,6 @@ from pydantic import TypeAdapter, ValidationError
 
 from mizan.types import Assertion, Case, ConfigError, Prompt, explain
 
-# Only {{name}} is a variable. Other braces pass through, so a prompt can hold JSON.
 VARIABLE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 
 ASSERTION = TypeAdapter(Assertion)
@@ -26,7 +23,7 @@ def render(template: str, variables: Mapping[str, str]) -> str:
 
 def build_cases(
     rows: Sequence[Mapping[str, Any]],
-    default_assertions: Sequence[Mapping[str, Any]],
+    assertion_templates: Sequence[Mapping[str, Any]],
     system_template: str | None,
     user_template: str,
 ) -> tuple[Case, ...]:
@@ -44,7 +41,7 @@ def build_cases(
         seen_ids.add(case_id)
 
         try:
-            case = build_case(case_id, row, default_assertions, system_template, user_template)
+            case = build_case(case_id, row, assertion_templates, system_template, user_template)
         except ConfigError as error:
             raise ConfigError(f'Case "{case_id}": {error}') from error
         cases.append(case)
@@ -55,7 +52,7 @@ def build_cases(
 def build_case(
     case_id: str,
     row: Mapping[str, Any],
-    default_assertions: Sequence[Mapping[str, Any]],
+    assertion_templates: Sequence[Mapping[str, Any]],
     system_template: str | None,
     user_template: str,
 ) -> Case:
@@ -77,7 +74,7 @@ def build_case(
     prompt = Prompt(system=system, user=render(user_template, variables))
 
     assertions = []
-    for raw in [*default_assertions, *own_assertions]:
+    for raw in [*assertion_templates, *own_assertions]:
         assertions.append(build_assertion(raw, variables))
     if not assertions:
         raise ConfigError(

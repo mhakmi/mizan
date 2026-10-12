@@ -1,8 +1,3 @@
-"""How cases are run, and how a failed call becomes an Errored result.
-
-Nothing here touches a network or a file. Every effect arrives as a Complete function.
-"""
-
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 
@@ -16,8 +11,6 @@ def run_cases(
     ask_judge: Complete | None,
     concurrency: int,
 ) -> tuple[CaseResult, ...]:
-    """Run every case and return the results in dataset order."""
-
     def run_one(case: Case) -> CaseResult:
         return run_case(case, complete, ask_judge)
 
@@ -26,11 +19,6 @@ def run_cases(
 
 
 def run_case(case: Case, complete: Complete, ask_judge: Complete | None) -> CaseResult:
-    """Run one case.
-
-    Only Unscorable is caught. Any other exception is a bug in Mizan, and the
-    command line prints its traceback.
-    """
     try:
         reply = complete(case.prompt)
     except ProviderError as error:

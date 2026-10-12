@@ -1,9 +1,8 @@
-"""What a run score is, how it is compared with a baseline, and what fails."""
-
 from collections.abc import Sequence
 from statistics import fmean
 
 from mizan.types import (
+    SCORE_DECIMALS,
     Baseline,
     CaseChange,
     Comparison,
@@ -19,15 +18,10 @@ from mizan.types import (
 
 
 def run_score(scored: Sequence[Scored]) -> float:
-    """The plain mean of the case scores. Every case counts the same."""
-    return round(fmean(result.score for result in scored), 4)
+    return round(fmean(result.score for result in scored), SCORE_DECIMALS)
 
 
 def compare(scored: Sequence[Scored], baseline: Baseline) -> Comparison | None:
-    """Line the run up against the baseline by case id.
-
-    Returns None when the two share no case id.
-    """
     changes = {}
     new_cases = []
     for result in scored:
@@ -47,12 +41,11 @@ def compare(scored: Sequence[Scored], baseline: Baseline) -> Comparison | None:
     )
 
 
-def baseline_score(comparison: Comparison) -> float:
+def shared_baseline_score(comparison: Comparison) -> float:
     return fmean(change.baseline for change in comparison.changes.values())
 
 
-def current_score(comparison: Comparison) -> float:
-    """The score of this run over the cases the baseline also has."""
+def shared_run_score(comparison: Comparison) -> float:
     return fmean(change.current for change in comparison.changes.values())
 
 
@@ -96,9 +89,9 @@ def evaluate(summary: RunSummary, baseline: Baseline | None, gate: Gate) -> Verd
         )
 
     if comparison is not None:
-        before = baseline_score(comparison)
-        after = current_score(comparison)
-        drop = round(before - after, 4)
+        before = shared_baseline_score(comparison)
+        after = shared_run_score(comparison)
+        drop = round(before - after, SCORE_DECIMALS)
         if drop > gate.max_drop:
             failures.append(
                 GateFailure(
@@ -112,7 +105,7 @@ def evaluate(summary: RunSummary, baseline: Baseline | None, gate: Gate) -> Verd
             )
         if gate.max_case_drop is not None:
             for case_id, change in comparison.changes.items():
-                case_drop = round(change.baseline - change.current, 4)
+                case_drop = round(change.baseline - change.current, SCORE_DECIMALS)
                 if case_drop > gate.max_case_drop:
                     failures.append(
                         GateFailure(
@@ -168,6 +161,5 @@ def count_cases(count: int) -> str:
 
 
 def baseline_from(summary: RunSummary) -> Baseline:
-    """The baseline that records this run. Case order follows the dataset."""
     cases = {result.case_id: result.score for result in summary.scored()}
     return Baseline(model=summary.model, judge=summary.judge, cases=cases)

@@ -1,10 +1,8 @@
-"""How a run is shown to a person. Returns text and prints nothing."""
-
 from collections import Counter
 from pathlib import Path
 from typing import assert_never
 
-from mizan.gate import baseline_score, count_cases, current_score
+from mizan.gate import count_cases, shared_baseline_score, shared_run_score
 from mizan.types import (
     Assertion,
     Comparison,
@@ -27,10 +25,6 @@ CASES_SHOWN_ON_FAILURE = 5
 
 
 def render_text(config_path: Path, summary: RunSummary, verdict: Verdict, gate: Gate) -> str:
-    """The terminal output: header, one table row per case, the verdict, details.
-
-    Plain text with no colour codes, so a CI log shows the same thing as a terminal.
-    """
     lines = [f"Mizan   {config_path}", f"Model   {summary.model}"]
     if summary.judge is not None:
         lines.append(f"Judge   {summary.judge}")
@@ -87,8 +81,8 @@ def table(
         baseline = "-"
         change = "-"
         if comparison is not None:
-            baseline = f"{baseline_score(comparison):.2f}"
-            change = format_change(current_score(comparison) - baseline_score(comparison))
+            baseline = f"{shared_baseline_score(comparison):.2f}"
+            change = format_change(shared_run_score(comparison) - shared_baseline_score(comparison))
         largest = f"largest {largest_prompt(summary.scored())}"
         lines.append(f"{'Run':<{width}}  {score:>5.2f}  {baseline:>8}  {change:>6}  {largest:>13}")
 
@@ -109,7 +103,7 @@ def largest_prompt(scored: tuple[Scored, ...]) -> int:
 def passed_details(summary: RunSummary, verdict: Passed, gate: Gate) -> list[str]:
     score_line = f"  Score {verdict.score:.2f}."
     if verdict.comparison is not None:
-        score_line += f" Baseline {baseline_score(verdict.comparison):.2f}."
+        score_line += f" Baseline {shared_baseline_score(verdict.comparison):.2f}."
         score_line += f" Allowed drop {gate.max_drop:.2f}."
     elif gate.min_score is not None:
         score_line += f" Minimum {gate.min_score:.2f}."
@@ -126,8 +120,10 @@ def failed_details(summary: RunSummary, verdict: GateFailed) -> list[str]:
     lines = [f"  {failure.check:<{width}}   {failure.message}" for failure in verdict.failures]
     lines.extend(f"  {note}" for note in verdict.notes)
 
-    # A run that only went over the token budget has no quality problem to explain.
-    if all(failure.check == "max_prompt_tokens" for failure in verdict.failures):
+    only_the_budget_failed = all(
+        failure.check == "max_prompt_tokens" for failure in verdict.failures
+    )
+    if only_the_budget_failed:
         return lines
 
     changes = {}
@@ -157,7 +153,6 @@ def failed_details(summary: RunSummary, verdict: GateFailed) -> list[str]:
 
 
 def failed_checks(result: Scored) -> list[str]:
-    """One line for each assertion that scored under 1, with its reason."""
     failed = [check for check in result.checks if check.score < 1]
     labels = [describe(check.assertion) for check in failed]
     width = max((len(label) for label in labels), default=0)
@@ -185,7 +180,6 @@ def describe(assertion: Assertion) -> str:
 def incomplete_details(summary: RunSummary) -> list[str]:
     errored = summary.errored()
     lines = [f"  {count_cases(len(errored))} could not be scored, so the gate was not checked."]
-    # Grouped by reason, so twenty cases that failed on one bad API key print one line.
     for reason, count in Counter(result.reason for result in errored).items():
         lines.append(f"  {count_cases(count)}  {reason}")
     return lines
