@@ -12,7 +12,9 @@ EXAMPLE = Path(__file__).parent.parent / "examples" / "support-bot"
 
 @pytest.fixture
 def example(tmp_path):
-    return Path(shutil.copytree(EXAMPLE, tmp_path / "support-bot"))
+    # A report left behind by a manual run is not part of the example.
+    without_report = shutil.ignore_patterns("mizan-report.json")
+    return Path(shutil.copytree(EXAMPLE, tmp_path / "support-bot", ignore=without_report))
 
 
 def run(example, *arguments):
@@ -106,9 +108,15 @@ def test_update_baseline_writes_the_baseline_that_is_committed_with_the_example(
     assert run(example) == 0
 
 
-def test_update_baseline_replaces_a_baseline_without_comparing_against_it(example):
-    rewrite(example / "mizan.baseline.json", '"shipping-time": 0.8333', '"shipping-time": 0.1')
-    rewrite(example / "mizan.baseline.json", '"late-return": 1.0', '"retired-case": 1.0')
+def test_update_baseline_replaces_a_baseline_the_run_would_fail_against(example):
+    stale = {
+        "version": 1,
+        "model": "fake:model.toml",
+        "judge": "fake:judge.toml",
+        "cases": {"shipping-time": 1.0},
+    }
+    (example / "mizan.baseline.json").write_text(json.dumps(stale))
+    assert run(example) == 1
 
     assert run(example, "--update-baseline") == 0
 

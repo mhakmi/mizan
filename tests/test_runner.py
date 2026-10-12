@@ -123,3 +123,16 @@ def test_a_bug_in_a_model_function_is_not_hidden_as_an_errored_case():
 
     with pytest.raises(KeyError):
         run_cases((case,), complete=model, ask_judge=None, concurrency=1)
+
+
+def test_a_bug_in_a_judge_function_is_not_hidden_as_an_errored_case():
+    case = case_with("late-return", "Can I return boots?", RUBRIC)
+
+    def model(prompt: Prompt) -> Reply:
+        return Reply(text="You have 30 days.", prompt_tokens=7)
+
+    def judge(prompt: Prompt) -> Reply:
+        raise KeyError("usage")
+
+    with pytest.raises(KeyError):
+        run_cases((case,), complete=model, ask_judge=judge, concurrency=1)
