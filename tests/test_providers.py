@@ -267,6 +267,14 @@ def test_a_replies_file_with_a_mistake_is_rejected_with_the_file_named(tmp_path)
         load_fake_rules(path)
 
 
+def test_a_rule_with_no_phrases_is_rejected_because_it_would_answer_every_prompt(tmp_path):
+    path = tmp_path / "model.toml"
+    path.write_text('[[reply]]\nwhen = []\ntext = "It has shipped."\n')
+
+    with pytest.raises(ConfigError, match="(?s)model.toml is not a valid replies file.*when"):
+        load_fake_rules(path)
+
+
 class CannedHttp:
     def __init__(self, monkeypatch, *outcomes):
         self.outcomes = list(outcomes)

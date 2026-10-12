@@ -6,7 +6,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, assert_never
+from typing import Annotated, Any, assert_never
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -192,7 +192,7 @@ def openai_model(settings: OpenAIModel, api_key: str, post: PostJson = post_json
 
 
 class FakeRule(Shape):
-    when: tuple[str, ...]
+    when: Annotated[tuple[str, ...], Field(min_length=1)]
     text: str
 
 
