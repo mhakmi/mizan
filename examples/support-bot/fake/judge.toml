@@ -1,0 +1,37 @@
+# Scripted grades for the example. Synthetic, written by hand.
+#
+# The judge prompt holds the question, the answer and the rubric. Each rule
+# starts its phrase at the <answer> tag, so it can only match the answer and
+# never the reference inside the rubric.
+
+[[reply]]
+when = ["<answer>\nReturns are accepted within 30 days of delivery, so I'm sorry"]
+text = '{"reason": "The answer gives the 30 day limit and says the order cannot be returned.", "score": 5}'
+
+[[reply]]
+when = ["<answer>\nSure, you can send them back whenever you like."]
+text = '{"reason": "The answer says returns have no deadline. The reference says 30 days.", "score": 1}'
+
+[[reply]]
+when = ["<answer>\nI'm sorry about the tent. Damaged items are replaced"]
+text = '{"reason": "The answer offers a free replacement, as the reference does.", "score": 5}'
+
+[[reply]]
+when = ["<answer>\nI'm sorry about the tent. I can offer you a refund"]
+text = '{"reason": "The answer offers a refund and does not mention a replacement.", "score": 2}'
+
+[[reply]]
+when = ["<answer>\nStandard shipping takes 3 to 5 days."]
+text = '{"reason": "The answer gives the range but leaves out that these are business days.", "score": 4}'
+
+[[reply]]
+when = ["<answer>\nGift cards never expire, so yours stays valid."]
+text = '{"reason": "The answer says gift cards never expire, as the reference does.", "score": 5}'
+
+[[reply]]
+when = ["<answer>\nYes. An order can be cancelled until it ships."]
+text = '{"reason": "The answer gives the shipping cutoff, as the reference does.", "score": 5}'
+
+[[reply]]
+when = ["<answer>\nOur policies do not cover price comparisons."]
+text = '{"reason": "The answer declines the comparison and offers a person.", "score": 5}'

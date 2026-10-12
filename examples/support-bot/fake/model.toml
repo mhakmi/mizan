@@ -1,0 +1,38 @@
+# Scripted answers for the example. Synthetic, written by hand.
+#
+# The first rule whose phrases all appear in the prompt gives the answer. A
+# rule that names a line of the system prompt stops matching when that line is
+# removed, and a later rule then gives a worse answer. That is how the example
+# shows a quality drop with no real model.
+
+[[reply]]
+when = ["Returns are accepted within 30 days", "40 days ago"]
+text = "Returns are accepted within 30 days of delivery, so I'm sorry, this order can no longer be returned."
+
+[[reply]]
+when = ["40 days ago"]
+text = "Sure, you can send them back whenever you like."
+
+[[reply]]
+when = ["Damaged items are replaced", "torn seam"]
+text = "I'm sorry about the tent. Damaged items are replaced free of charge when reported within 7 days, so we will replace it."
+
+[[reply]]
+when = ["torn seam"]
+text = "I'm sorry about the tent. I can offer you a refund for it."
+
+[[reply]]
+when = ["3 to 5 business days", "How long does standard shipping take"]
+text = "Standard shipping takes 3 to 5 days."
+
+[[reply]]
+when = ["Gift cards never expire", "gift card"]
+text = "Gift cards never expire, so yours stays valid."
+
+[[reply]]
+when = ["cancelled until they ship", "cancel it"]
+text = "Yes. An order can be cancelled until it ships."
+
+[[reply]]
+when = ["cheaper than the ones other shops sell"]
+text = "Our policies do not cover price comparisons. I can connect you with a person who can help."

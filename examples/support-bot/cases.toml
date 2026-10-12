@@ -1,0 +1,44 @@
+# Synthetic data. Acme Outdoor is a made-up shop, and these questions were
+# written for this example. None of them came from a real customer.
+#
+# Every key other than "id" and "assert" is a value that a template can use
+# as {{name}}.
+
+[[case]]
+id = "late-return"
+question = "I bought hiking boots 40 days ago and they don't fit. Can I send them back?"
+reference = "Returns are accepted within 30 days of delivery, so this order can no longer be returned."
+must_include = "30 days"
+
+[[case]]
+id = "damaged-item"
+question = "My tent arrived yesterday with a torn seam. What now?"
+reference = "Damaged items are replaced free of charge when reported within 7 days."
+must_include = "replace"
+
+[[case]]
+id = "shipping-time"
+question = "How long does standard shipping take?"
+reference = "Standard shipping takes 3 to 5 business days."
+must_include = "3 to 5"
+
+[[case]]
+id = "gift-card"
+question = "Does my gift card run out at some point?"
+reference = "Gift cards never expire."
+must_include = "never expire"
+
+[[case]]
+id = "cancel-order"
+question = "I ordered a camping stove an hour ago. Can I still cancel it?"
+reference = "Orders can be cancelled until they ship."
+must_include = "until it ships"
+
+[[case]]
+id = "competitor-question"
+question = "Is your tent cheaper than the ones other shops sell?"
+reference = "The assistant says the policies do not cover price comparisons and offers a person."
+must_include = "person"
+assert = [
+  { type = "not-contains", value = "cheaper than", ignore_case = true },
+]

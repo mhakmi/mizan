@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "model": "fake:model.toml",
+  "judge": "fake:judge.toml",
+  "cases": {
+    "late-return": 1.0,
+    "damaged-item": 1.0,
+    "shipping-time": 0.8333,
+    "gift-card": 1.0,
+    "cancel-order": 1.0,
+    "competitor-question": 1.0
+  }
+}

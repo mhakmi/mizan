@@ -1,0 +1,43 @@
+# An example project. The shop, its policies and the customer questions are
+# synthetic. The model and the judge are scripted, so this runs with no API key
+# and no network.
+
+dataset = "cases.toml"
+
+[prompt]
+system = "prompts/system.md"
+user = "prompts/user.md"
+
+# The model your feature runs on in production. For a real model, write:
+#   provider = "anthropic"
+#   name = "claude-opus-5-5"
+[model]
+provider = "fake"
+replies = "fake/model.toml"
+
+# The model that grades answers for llm-rubric assertions. For a real judge:
+#   provider = "anthropic"
+#   name = "claude-sonnet-5-5"
+[judge]
+provider = "fake"
+replies = "fake/judge.toml"
+
+# Everything that can fail a run is in this table.
+[gate]
+min_score = 0.80            # fail when the run score is below this
+max_drop = 0.05             # fail when the run score falls this far below the baseline
+max_prompt_tokens = 400     # fail when any case sends more input tokens than this
+
+# Assertions here apply to every case. A case can add its own.
+[[assert]]
+type = "llm-rubric"
+rubric = """
+The answer agrees with the reference and says nothing that contradicts it.
+Reference: {{reference}}
+"""
+weight = 2
+
+[[assert]]
+type = "contains"
+value = "{{must_include}}"
+ignore_case = true
