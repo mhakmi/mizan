@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "model": "command:python3 reader.py '{{folder}}'",
+  "judge": null,
+  "cases": {
+    "receipt-1041": 1.0,
+    "receipt-1042": 1.0,
+    "receipt-1043": 1.0,
+    "receipt-1044": 1.0
+  }
+}

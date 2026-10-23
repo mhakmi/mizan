@@ -1,0 +1,23 @@
+# The example project, scored with the changed reader in this folder. The
+# receipts, their expected files and the baseline are the ones one folder up.
+# All of them are synthetic.
+
+baseline = "../mizan.baseline.json"
+report = "../mizan-report.json"
+
+[dataset]
+folder = "../receipts"
+
+[dataset.kinds]
+date = "date"
+total = { amount = "decimal", currency = "exact" }
+tip = { amount = "decimal", currency = "exact" }
+
+[model]
+provider = "command"
+argv = ["python3", "reader.py", "{{folder}}"]
+
+[gate]
+min_score = 0.90
+max_drop = 0.05
+max_prompt_tokens = 200

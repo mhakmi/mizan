@@ -1,0 +1,8 @@
+Synthetic receipt for the Mizan example. Blue Kettle Cafe is a made-up shop.
+
+Shop: Blue Kettle Cafe
+Date: October 6, 2026
+
+Pour-over beans, 340 g   23.40
+
+Total: 23.40

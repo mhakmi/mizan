@@ -1,0 +1,10 @@
+Synthetic receipt for the Mizan example. Blue Kettle Cafe is a made-up shop.
+
+Shop: BLUE KETTLE  CAFE
+Date: 2026-10-04
+
+Drip coffee      3.25
+Croissant        5.50
+
+Total: 8.75 CAD
+Tip: 1.25 CAD

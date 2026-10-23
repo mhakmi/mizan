@@ -1,0 +1,27 @@
+# An example project. Blue Kettle Cafe is a made-up shop. Its receipts, and the
+# expected files beside them, are synthetic. The program this scores is
+# reader.py in this folder, so the example needs no API key and no network.
+
+# Each <name>.expected.json in the folder is a case. Each of its keys is
+# checked against the same key in the program's output for <name>.
+[dataset]
+folder = "receipts"
+
+# How each key compares. A key not listed here compares as text.
+[dataset.kinds]
+date = "date"
+total = { amount = "decimal", currency = "exact" }
+tip = { amount = "decimal", currency = "exact" }
+
+# The program to score. It runs once, in this folder, and {{folder}} becomes
+# the dataset folder. It prints one JSON line per receipt with the keys id,
+# output, error and prompt_tokens.
+[model]
+provider = "command"
+argv = ["python3", "reader.py", "{{folder}}"]
+
+# Everything that can fail a run is in this table.
+[gate]
+min_score = 0.90
+max_drop = 0.05
+max_prompt_tokens = 200

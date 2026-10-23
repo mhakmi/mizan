@@ -1,0 +1,10 @@
+Synthetic receipt for the Mizan example. Blue Kettle Cafe is a made-up shop.
+
+Shop: Blue Kettle Cafe
+Date: 01 Oct 2026
+
+Catering for 40, coffee and pastries   1,100.00
+Delivery                                  150.00
+
+Total: 1,250.00 CAD
+Tip: 150.00 CAD

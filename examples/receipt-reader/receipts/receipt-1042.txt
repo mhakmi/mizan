@@ -1,0 +1,9 @@
+Synthetic receipt for the Mizan example. Blue Kettle Cafe is a made-up shop.
+
+Shop: Blue Kettle Cafe
+Date: Oct 3, 2026
+
+Oat latte        5.25
+Banana bread     7.25
+
+Total: 12.5 CAD
