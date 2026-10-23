@@ -1,12 +1,26 @@
+import json
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, assert_never
 
 from pydantic import ValidationError
 
 from mizan.cases import build_cases
-from mizan.types import Baseline, Case, Config, ConfigError, LlmRubric, Report, explain
+from mizan.fields import Kind
+from mizan.types import (
+    Baseline,
+    Case,
+    Config,
+    ConfigError,
+    FolderDataset,
+    LlmRubric,
+    Report,
+    explain,
+)
+
+EXPECTED_SUFFIX = ".expected.json"
 
 
 @dataclass(frozen=True)
@@ -15,6 +29,7 @@ class Project:
     config_dir: Path
     config: Config
     cases: tuple[Case, ...]
+    folder: Path | None
     baseline: Baseline | None
     baseline_path: Path
     report_path: Path
@@ -43,10 +58,17 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
             system_template = read_text(config_dir / config.prompt.system)
         user_template = read_text(config_dir / config.prompt.user)
 
-    dataset_path = config_dir / config.dataset
-    rows = read_toml(dataset_path).get("case", [])
-    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
-        raise ConfigError(f"{dataset_path}: the cases must be [[case]] tables.")
+    match config.dataset:
+        case FolderDataset():
+            dataset_path = config_dir / config.dataset.folder
+            folder = dataset_path
+            rows = read_folder_rows(dataset_path, config.dataset.kinds)
+        case Path():
+            dataset_path = config_dir / config.dataset
+            folder = None
+            rows = read_case_tables(dataset_path)
+        case _:
+            assert_never(config.dataset)
     try:
         cases = build_cases(rows, config.assertion_templates, system_template, user_template)
     except ConfigError as error:
@@ -67,10 +89,51 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
         config_dir=config_dir,
         config=config,
         cases=cases,
+        folder=folder,
         baseline=read_baseline(baseline_path),
         baseline_path=baseline_path,
         report_path=config_dir / config.report,
     )
+
+
+def read_case_tables(path: Path) -> list[dict[str, Any]]:
+    rows = read_toml(path).get("case", [])
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        raise ConfigError(f"{path}: the cases must be [[case]] tables.")
+    return rows
+
+
+def read_folder_rows(folder: Path, kinds: Mapping[str, Kind]) -> list[dict[str, Any]]:
+    """Make one case for each <id>.expected.json in the folder, with one field-equals per key.
+
+    No other file in the folder is opened.
+    """
+    if not folder.is_dir():
+        raise ConfigError(f"The dataset folder {folder} does not exist.")
+
+    rows = []
+    for path in sorted(folder.glob("*" + EXPECTED_SUFFIX)):
+        try:
+            expected = json.loads(read_text(path))
+        except json.JSONDecodeError as error:
+            raise ConfigError(f"{path} is not valid JSON. {error}") from error
+        if not isinstance(expected, dict):
+            raise ConfigError(f"{path} must hold one JSON object.")
+
+        assertions = []
+        for key, value in expected.items():
+            if "." in key:
+                raise ConfigError(f'{path}: the key "{key}" has a dot, so no path can name it.')
+            assertions.append(
+                {
+                    "type": "field-equals",
+                    "path": key,
+                    "expected": value,
+                    "kind": kinds.get(key, "text"),
+                }
+            )
+        rows.append({"id": path.name.removesuffix(EXPECTED_SUFFIX), "assert": assertions})
+    return rows
 
 
 def read_text(path: Path) -> str:

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from mizan.files import load_project, write_baseline, write_report
+from mizan.files import load_project, read_folder_rows, write_baseline, write_report
 from mizan.types import (
     AssertionScore,
     Baseline,
@@ -247,3 +247,74 @@ def test_the_report_holds_the_full_output_of_each_case(tmp_path):
             "score": 0.0,
         }
     ]
+
+
+def write_expected(folder, case_id, text):
+    folder.mkdir(exist_ok=True)
+    (folder / f"{case_id}.expected.json").write_text(text)
+
+
+def test_each_expected_file_in_a_folder_is_a_case_with_one_field_check_per_key(tmp_path):
+    samples = tmp_path / "samples"
+    write_expected(samples, "corner-market", '{"date": "2026-10-03", "total": {"amount": "12.50"}}')
+    write_expected(samples, "blue-kettle", '{"correspondent": "Blue Kettle"}')
+    (samples / "blue-kettle.png").write_bytes(b"not an image")
+    (samples / "scratch.json").write_text("not JSON either")
+
+    rows = read_folder_rows(samples, {"date": "date", "total": {"amount": "decimal"}})
+
+    assert rows == [
+        {
+            "id": "blue-kettle",
+            "assert": [
+                {
+                    "type": "field-equals",
+                    "path": "correspondent",
+                    "expected": "Blue Kettle",
+                    "kind": "text",
+                }
+            ],
+        },
+        {
+            "id": "corner-market",
+            "assert": [
+                {"type": "field-equals", "path": "date", "expected": "2026-10-03", "kind": "date"},
+                {
+                    "type": "field-equals",
+                    "path": "total",
+                    "expected": {"amount": "12.50"},
+                    "kind": {"amount": "decimal"},
+                },
+            ],
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ('{"date": ', "corner-market.expected.json is not valid JSON"),
+        ('["2026-10-03"]', "corner-market.expected.json must hold one JSON object"),
+        ('{"total.amount": "12.50"}', 'the key "total.amount" has a dot'),
+    ],
+    ids=["not JSON", "not an object", "dotted key"],
+)
+def test_an_expected_file_that_cannot_make_a_case_stops_the_load(tmp_path, text, message):
+    write_expected(tmp_path / "samples", "corner-market", text)
+
+    with pytest.raises(ConfigError, match=message):
+        read_folder_rows(tmp_path / "samples", {})
+
+
+def test_a_missing_dataset_folder_stops_the_load(tmp_path):
+    with pytest.raises(ConfigError, match="samples does not exist"):
+        read_folder_rows(tmp_path / "samples", {})
+
+
+def test_a_dataset_folder_with_a_chat_model_stops_the_load(project_dir):
+    rewrite(
+        project_dir / "mizan.toml", 'dataset = "cases.toml"', 'dataset = { folder = "samples" }'
+    )
+
+    with pytest.raises(ConfigError, match='a dataset folder needs provider = "command"'):
+        load_project(project_dir / "mizan.toml")

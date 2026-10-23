@@ -248,6 +248,11 @@ JudgeSettings = Annotated[ChatModels, Field(discriminator="provider")]
 ModelSettings = Annotated[ChatModels, Field(discriminator="provider")]
 
 
+class FolderDataset(Shape):
+    folder: Path
+    kinds: dict[str, Kind] = {}
+
+
 class PromptFiles(Shape):
     system: Path | None = None
     user: Path
@@ -261,7 +266,7 @@ class Gate(Shape):
 
 
 class Config(Shape):
-    dataset: Path
+    dataset: Path | FolderDataset
     baseline: Path = Path("mizan.baseline.json")
     report: Path = Path("mizan-report.json")
     concurrency: Annotated[int, Field(ge=1)] = 4
@@ -277,6 +282,9 @@ class Config(Shape):
             case AnthropicModel() | OpenAIModel() | FakeModel():
                 if self.prompt is None:
                     raise ValueError(f'provider = "{self.model.provider}" needs a [prompt] table')
+                if isinstance(self.dataset, FolderDataset):
+                    # Pydantic reports a ValueError as a mistake in the file, and a TypeError as a bug.
+                    raise ValueError('a dataset folder needs provider = "command"')  # noqa: TRY004
             case _:
                 assert_never(self.model)
         return self
