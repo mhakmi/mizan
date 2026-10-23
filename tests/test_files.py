@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from mizan.assertions import check
 from mizan.files import load_project, read_folder_rows, write_baseline, write_report
 from mizan.types import (
     AssertionScore,
@@ -9,6 +10,7 @@ from mizan.types import (
     ConfigError,
     Contains,
     FakeModel,
+    FieldEquals,
     Incomplete,
     Report,
     RunSummary,
@@ -267,24 +269,21 @@ def test_each_expected_file_in_a_folder_is_a_case_with_one_field_check_per_key(t
         {
             "id": "blue-kettle",
             "assert": [
-                {
-                    "type": "field-equals",
-                    "path": "correspondent",
-                    "expected": "Blue Kettle",
-                    "kind": "text",
-                }
+                FieldEquals(
+                    type="field-equals", path="correspondent", expected="Blue Kettle", kind="text"
+                )
             ],
         },
         {
             "id": "corner-market",
             "assert": [
-                {"type": "field-equals", "path": "date", "expected": "2026-10-03", "kind": "date"},
-                {
-                    "type": "field-equals",
-                    "path": "total",
-                    "expected": {"amount": "12.50"},
-                    "kind": {"amount": "decimal"},
-                },
+                FieldEquals(type="field-equals", path="date", expected="2026-10-03", kind="date"),
+                FieldEquals(
+                    type="field-equals",
+                    path="total",
+                    expected={"amount": "12.50"},
+                    kind={"amount": "decimal"},
+                ),
             ],
         },
     ]
@@ -296,14 +295,31 @@ def test_each_expected_file_in_a_folder_is_a_case_with_one_field_check_per_key(t
         ('{"date": ', "corner-market.expected.json is not valid JSON"),
         ('["2026-10-03"]', "corner-market.expected.json must hold one JSON object"),
         ('{"total.amount": "12.50"}', 'the key "total.amount" has a dot'),
+        (
+            '{"total": "eleven"}',
+            '(?s)corner-market.expected.json: the key "total".*"eleven" is not a decimal',
+        ),
     ],
-    ids=["not JSON", "not an object", "dotted key"],
+    ids=["not JSON", "not an object", "dotted key", "not a decimal"],
 )
 def test_an_expected_file_that_cannot_make_a_case_stops_the_load(tmp_path, text, message):
     write_expected(tmp_path / "samples", "corner-market", text)
 
     with pytest.raises(ConfigError, match=message):
-        read_folder_rows(tmp_path / "samples", {})
+        read_folder_rows(tmp_path / "samples", {"total": "decimal"})
+
+
+def test_an_expected_value_in_a_folder_is_compared_as_written_and_not_as_a_template(tmp_path):
+    write_expected(tmp_path / "samples", "coupon", '{"note": "use code {{PROMO}}"}')
+    (tmp_path / "mizan.toml").write_text(
+        '[dataset]\nfolder = "samples"\n\n[model]\nprovider = "command"\nargv = ["reader"]\n'
+    )
+
+    (case,) = load_project(tmp_path / "mizan.toml").cases
+    (assertion,) = case.assertions
+
+    assert assertion.expected == "use code {{PROMO}}"
+    assert check(assertion, case, '{"note": "use code {{PROMO}}"}', None).score == 1.0
 
 
 def test_a_missing_dataset_folder_stops_the_load(tmp_path):

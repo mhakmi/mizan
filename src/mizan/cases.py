@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from mizan.types import Assertion, Case, ConfigError, Prompt, explain
+from mizan.types import Assertion, Case, ConfigError, FieldEquals, Prompt, explain
 
 VARIABLE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
 
@@ -77,7 +77,10 @@ def build_case(
 
     assertions = []
     for raw in [*assertion_templates, *own_assertions]:
-        assertions.append(build_assertion(raw, variables))
+        if isinstance(raw, FieldEquals):
+            assertions.append(raw)
+        else:
+            assertions.append(build_assertion(raw, variables))
     if not assertions:
         raise ConfigError(
             "There is nothing to check. Add an [[assert]] table to the config "

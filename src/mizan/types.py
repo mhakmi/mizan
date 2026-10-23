@@ -243,9 +243,19 @@ class FakeModel(Shape):
     replies: Path
 
 
+class CommandModel(Shape):
+    provider: Literal["command"]
+    argv: Annotated[tuple[str, ...], Field(min_length=1)]
+    env: dict[str, str] = {}
+    id_key: str = "id"
+    output_key: str = "output"
+    error_key: str = "error"
+    tokens_key: str = "prompt_tokens"
+
+
 ChatModels = AnthropicModel | OpenAIModel | FakeModel
 JudgeSettings = Annotated[ChatModels, Field(discriminator="provider")]
-ModelSettings = Annotated[ChatModels, Field(discriminator="provider")]
+ModelSettings = Annotated[ChatModels | CommandModel, Field(discriminator="provider")]
 
 
 class FolderDataset(Shape):
@@ -279,6 +289,13 @@ class Config(Shape):
     @model_validator(mode="after")
     def parts_fit_the_model(self) -> Self:
         match self.model:
+            case CommandModel():
+                if self.prompt is not None:
+                    raise ValueError("a command project has no [prompt] table")
+                if self.judge is not None:
+                    raise ValueError(
+                        "a command project cannot use llm-rubric, so [judge] has no use"
+                    )
             case AnthropicModel() | OpenAIModel() | FakeModel():
                 if self.prompt is None:
                     raise ValueError(f'provider = "{self.model.provider}" needs a [prompt] table')

@@ -14,6 +14,7 @@ from mizan.types import (
     Case,
     Config,
     ConfigError,
+    FieldEquals,
     FolderDataset,
     LlmRubric,
     Report,
@@ -49,6 +50,11 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
     except ValidationError as error:
         raise ConfigError(f"{config_path} is not a valid config.\n{explain(error)}") from error
 
+    if system_prompt_override is not None and config.prompt is None:
+        raise ConfigError(
+            "--system-prompt needs a [prompt] table, and this project runs a command."
+        )
+
     system_template = None
     user_template = None
     if config.prompt is not None:
@@ -74,14 +80,20 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
     except ConfigError as error:
         raise ConfigError(f"{dataset_path}: {error}") from error
 
-    if config.judge is None:
-        for case in cases:
-            for assertion in case.assertions:
-                if isinstance(assertion, LlmRubric):
-                    raise ConfigError(
-                        f'{config_path}: case "{case.id}" has an llm-rubric assertion, '
-                        "but the config has no [judge] table."
-                    )
+    for case in cases:
+        for assertion in case.assertions:
+            if not isinstance(assertion, LlmRubric):
+                continue
+            if case.prompt is None:
+                raise ConfigError(
+                    f'{config_path}: case "{case.id}" has an llm-rubric assertion, '
+                    "but a command project has no prompt to show the judge."
+                )
+            if config.judge is None:
+                raise ConfigError(
+                    f'{config_path}: case "{case.id}" has an llm-rubric assertion, '
+                    "but the config has no [judge] table."
+                )
 
     baseline_path = config_dir / config.baseline
     return Project(
@@ -124,14 +136,15 @@ def read_folder_rows(folder: Path, kinds: Mapping[str, Kind]) -> list[dict[str, 
         for key, value in expected.items():
             if "." in key:
                 raise ConfigError(f'{path}: the key "{key}" has a dot, so no path can name it.')
-            assertions.append(
-                {
-                    "type": "field-equals",
-                    "path": key,
-                    "expected": value,
-                    "kind": kinds.get(key, "text"),
-                }
-            )
+            try:
+                assertion = FieldEquals(
+                    type="field-equals", path=key, expected=value, kind=kinds.get(key, "text")
+                )
+            except ValidationError as error:
+                raise ConfigError(
+                    f'{path}: the key "{key}" cannot be checked.\n{explain(error)}'
+                ) from error
+            assertions.append(assertion)
         rows.append({"id": path.name.removesuffix(EXPECTED_SUFFIX), "assert": assertions})
     return rows
 

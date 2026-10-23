@@ -1,6 +1,7 @@
 import http.client
 import json
 import os
+import shlex
 import time
 import urllib.error
 import urllib.request
@@ -10,12 +11,14 @@ from typing import Annotated, Any, assert_never
 
 from pydantic import BaseModel, Field, ValidationError
 
+from mizan.command import answers_from_command
 from mizan.files import Project, read_toml
 from mizan.types import (
     Answer,
     AnthropicModel,
     Case,
     ChatModels,
+    CommandModel,
     Complete,
     ConfigError,
     FakeModel,
@@ -47,6 +50,8 @@ def prepare_answers(project: Project) -> Answer:
     """
     settings = project.config.model
     match settings:
+        case CommandModel():
+            return answers_from_command(settings, project.config_dir, project.folder, project.cases)
         case AnthropicModel() | OpenAIModel() | FakeModel():
             complete = connect(settings, project.config_dir)
 
@@ -86,6 +91,8 @@ def label(settings: ModelSettings) -> str:
             return f"openai:{settings.name}"
         case FakeModel():
             return f"fake:{settings.replies.name}"
+        case CommandModel():
+            return "command:" + shlex.join(settings.argv)
         case _:
             assert_never(settings)
 
