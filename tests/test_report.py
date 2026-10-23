@@ -7,6 +7,7 @@ from mizan.types import (
     Baseline,
     Contains,
     Errored,
+    FieldEquals,
     Gate,
     LlmRubric,
     RunSummary,
@@ -157,4 +158,25 @@ def test_notes_about_the_baseline_are_shown_under_the_verdict():
         "  Largest prompt 100 tokens.\n"
         "  Not in the baseline, so left out of the comparison: new.\n"
         "  In the baseline but no longer in the dataset: gone."
+    )
+
+
+def test_a_failed_field_check_names_the_field():
+    total = FieldEquals(type="field-equals", path="total", expected="12.50", kind="decimal")
+    result = Scored(
+        case_id="blue-kettle",
+        output='{"total": "1"}',
+        prompt_tokens=12,
+        checks=(
+            AssertionScore(assertion=total, score=0.0, reason="Field total differs."),
+            AssertionScore(assertion=CONTAINS, score=1.0, reason="Phrase check."),
+        ),
+    )
+
+    text = render([result], None, Gate(min_score=0.8))
+
+    assert text.endswith(
+        "Cases with the lowest scores\n"
+        "  blue-kettle  0.50\n"
+        "    0.00  field-equals total    Field total differs."
     )

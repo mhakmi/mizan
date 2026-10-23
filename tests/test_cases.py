@@ -1,7 +1,7 @@
 import pytest
 
-from mizan.cases import build_cases, render
-from mizan.types import ConfigError, Contains, LlmRubric, NotContains
+from mizan.cases import build_assertion, build_cases, render
+from mizan.types import ConfigError, Contains, FieldEquals, LlmRubric, NotContains
 
 USER_TEMPLATE = "Customer message:\n\n{{question}}"
 
@@ -103,3 +103,36 @@ CONTAINS = [{"type": "contains", "value": "x"}]
 def test_a_dataset_that_cannot_run_is_rejected_with_the_case_named(rows, defaults, message):
     with pytest.raises(ConfigError, match=f"(?s){message}"):
         build_cases(rows, defaults, None, USER_TEMPLATE)
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    [
+        (
+            {"path": "date", "expected": "03/10/2026", "kind": "date"},
+            'expected "03/10/2026" is not a date',
+        ),
+        ({"path": "total", "expected": "12.50", "kind": {"amount": "decimal"}}, "is not an object"),
+        ({"path": "receipt_number", "expected": 77955}, "expected 77955 is not text"),
+        ({"path": "total.", "expected": "12.50"}, 'path "total." is not valid'),
+        ({"path": "date", "value": "2026-10-03"}, "(?s)value.*Extra inputs"),
+        ({"path": "date", "expected": "2026-10-03", "kind": "datetime"}, "(?s)kind"),
+    ],
+    ids=[
+        "bad date",
+        "money that is not an object",
+        "number as text",
+        "bad path",
+        "misspelled key",
+        "unknown kind",
+    ],
+)
+def test_a_field_check_that_cannot_work_stops_the_load(raw, message):
+    with pytest.raises(ConfigError, match=message):
+        build_assertion({"type": "field-equals", **raw}, {})
+
+
+def test_a_field_check_with_no_expected_value_expects_null():
+    assertion = build_assertion({"type": "field-equals", "path": "tip", "kind": "decimal"}, {})
+
+    assert assertion == FieldEquals(type="field-equals", path="tip", expected=None, kind="decimal")

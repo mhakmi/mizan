@@ -4,12 +4,14 @@ from typing import Any, assert_never
 
 import jsonschema
 
+from mizan.fields import NoSuchField, differences, lookup, split_path
 from mizan.types import (
     Assertion,
     AssertionScore,
     Case,
     Complete,
     Contains,
+    FieldEquals,
     IsJson,
     JudgeReplyError,
     LlmRubric,
@@ -58,6 +60,8 @@ def check(
                 score, reason = 0.0, "The pattern does not match."
         case IsJson():
             score, reason = check_json(output, assertion.json_schema)
+        case FieldEquals():
+            score, reason = check_field(output, assertion)
         case LlmRubric():
             assert ask_judge is not None, "load_project rejects a rubric with no judge"
             score, reason = grade(assertion.rubric, case, output, ask_judge)
@@ -86,6 +90,22 @@ def check_json(output: str, json_schema: dict[str, Any] | None) -> tuple[float, 
     except jsonschema.ValidationError as error:
         return 0.0, f"The output does not fit the schema. {error.message}"
     return 1.0, "The output is valid JSON and fits the schema."
+
+
+def check_field(output: str, assertion: FieldEquals) -> tuple[float, str]:
+    try:
+        value = json.loads(output)
+    except json.JSONDecodeError:
+        return 0.0, "The output is not valid JSON."
+    try:
+        read = lookup(value, split_path(assertion.path))
+    except NoSuchField:
+        return 0.0, f'No field "{assertion.path}" in the output.'
+
+    difference = differences(assertion.kind, assertion.expected, read)
+    if difference is None:
+        return 1.0, f"Field {assertion.path} matches."
+    return 0.0, f"Field {assertion.path} differs. {difference}."
 
 
 def grade(rubric: str, case: Case, output: str, ask_judge: Complete) -> tuple[float, str]:

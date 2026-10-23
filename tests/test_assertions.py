@@ -4,6 +4,7 @@ from mizan.assertions import check, parse_judge_reply
 from mizan.types import (
     Case,
     Contains,
+    FieldEquals,
     IsJson,
     JudgeReplyError,
     LlmRubric,
@@ -52,6 +53,53 @@ def score(assertion, output, ask_judge=None):
 )
 def test_a_deterministic_assertion_scores_one_or_zero(assertion, output, expected):
     assert score(assertion, output) == expected
+
+
+def field(path, expected, kind="text"):
+    return FieldEquals(type="field-equals", path=path, expected=expected, kind=kind)
+
+
+MONEY = {"amount": "decimal", "currency": "exact"}
+RECEIPT = '{"date": "03 Oct 2026", "total": {"amount": "12.5", "currency": null}, "tip": null}'
+
+
+@pytest.mark.parametrize(
+    ("assertion", "output", "expected"),
+    [
+        (field("total.amount", "12.50", "decimal"), RECEIPT, 1.0),
+        (field("total.amount", "12.51", "decimal"), RECEIPT, 0.0),
+        (field("total.amount", "12.50"), RECEIPT, 0.0),
+        (field("date", "2026-10-03", "date"), RECEIPT, 1.0),
+        (field("date", "2026-10-04", "date"), RECEIPT, 0.0),
+        (field("total", {"amount": "12.50", "currency": None}, MONEY), RECEIPT, 1.0),
+        (field("total", {"amount": "12.50", "currency": "CAD"}, MONEY), RECEIPT, 0.0),
+        (field("tip", None, "decimal"), RECEIPT, 1.0),
+        (field("tip", "0.00", "decimal"), RECEIPT, 0.0),
+        (field("change", None, "decimal"), RECEIPT, 0.0),
+        (field("total.amount", "12.50", "decimal"), "Total: 12.50", 0.0),
+    ],
+)
+def test_a_field_scores_one_only_when_it_means_the_expected_value(assertion, output, expected):
+    assert score(assertion, output) == expected
+
+
+@pytest.mark.parametrize(
+    ("assertion", "output", "reason"),
+    [
+        (field("total.amount", "12.50", "decimal"), RECEIPT, "Field total.amount matches."),
+        (
+            field("total", {"amount": "1250.00"}, MONEY),
+            RECEIPT,
+            'Field total differs. amount: expected "1250.00", read "12.5".',
+        ),
+        (field("change", None), RECEIPT, 'No field "change" in the output.'),
+        (field("tip", None), "Tip: none", "The output is not valid JSON."),
+    ],
+)
+def test_a_field_check_says_what_it_read(assertion, output, reason):
+    case = Case(id="receipt", prompt=None, assertions=(assertion,))
+
+    assert check(assertion, case, output, None).reason == reason
 
 
 def test_a_failed_schema_check_says_which_rule_the_output_broke():

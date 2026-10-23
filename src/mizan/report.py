@@ -8,6 +8,7 @@ from mizan.types import (
     Comparison,
     Contains,
     Errored,
+    FieldEquals,
     Gate,
     GateFailed,
     Incomplete,
@@ -168,6 +169,8 @@ def describe(assertion: Assertion) -> str:
             text = f'{assertion.type} "{assertion.value}"'
         case Regex():
             text = f'{assertion.type} "{assertion.pattern}"'
+        case FieldEquals():
+            text = f"{assertion.type} {assertion.path}"
         case IsJson() | LlmRubric():
             text = assertion.type
         case _:

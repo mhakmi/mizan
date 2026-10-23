@@ -9,11 +9,14 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     ValidationError,
     computed_field,
     field_validator,
     model_validator,
 )
+
+from mizan.fields import Kind, check_expected, split_path
 
 
 class MizanError(Exception):
@@ -125,8 +128,28 @@ class LlmRubric(Shape):
     weight: Weight = 1.0
 
 
+class FieldEquals(Shape):
+    type: Literal["field-equals"]
+    path: str
+    # TOML has no null, so a missing expected means the field must be null.
+    expected: JsonValue = None
+    kind: Kind = "text"
+    weight: Weight = 1.0
+
+    @field_validator("path")
+    @classmethod
+    def path_splits(cls, path: str) -> str:
+        split_path(path)
+        return path
+
+    @model_validator(mode="after")
+    def expected_fits_kind(self) -> Self:
+        check_expected(self.kind, self.expected)
+        return self
+
+
 Assertion = Annotated[
-    Contains | NotContains | Regex | IsJson | LlmRubric,
+    Contains | NotContains | Regex | IsJson | LlmRubric | FieldEquals,
     Field(discriminator="type"),
 ]
 
