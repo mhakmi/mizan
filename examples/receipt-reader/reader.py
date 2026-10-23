@@ -1,10 +1,3 @@
-"""Read the receipts in a folder and print one JSON line for each.
-
-This is the program the example scores. It stands in for a real receipt
-reader, such as one that sends each scan to a model, and uses only the
-standard library.
-"""
-
 import json
 import sys
 from pathlib import Path
@@ -32,6 +25,10 @@ def read_money(text):
     return {"amount": amount.replace(",", ""), "currency": currency or None}
 
 
+def word_count_as_tokens(text):
+    return len(text.split())
+
+
 def main():
     folder = Path(sys.argv[1])
     for path in sorted(folder.glob("*.txt")):
@@ -44,8 +41,7 @@ def main():
                 "id": path.stem,
                 "output": read_receipt(text),
                 "error": None,
-                # A real reader would report the tokens its model call used.
-                "prompt_tokens": len(text.split()),
+                "prompt_tokens": word_count_as_tokens(text),
             }
         print(json.dumps(line))
 

@@ -43,11 +43,6 @@ ANTHROPIC_DEFAULT_MAX_TOKENS = 4096
 
 
 def prepare_answers(project: Project) -> Answer:
-    """Return the function that gives the reply for one case.
-
-    Raises ConfigError, before any case runs, when the model cannot be reached
-    at all, such as when its API key is missing.
-    """
     settings = project.config.model
     match settings:
         case CommandModel():

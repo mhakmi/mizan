@@ -6,16 +6,13 @@ from typing import Literal, assert_never
 from pydantic import JsonValue
 
 ScalarKind = Literal["text", "decimal", "date", "exact"]
-# A table of kinds compares an object such as money key by key. It is one level
-# deep because Python 3.11 cannot write a recursive type alias.
 Kind = ScalarKind | dict[str, ScalarKind]
 
-# A numeric day-and-month form such as 03/10/2026 reads two ways, so none is here.
 DATE_FORMATS = ("%Y-%m-%d", "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y")
 
 
 class NoSuchField(Exception):
-    """The path leads to nothing in the output."""
+    pass
 
 
 def split_path(path: str) -> tuple[str, ...]:
@@ -34,8 +31,7 @@ def lookup(output: JsonValue, path: tuple[str, ...]) -> JsonValue:
     return value
 
 
-def parse_scalar(kind: ScalarKind, value: JsonValue) -> str | Decimal | date:
-    """Return the form of a value that compares by meaning. Raises ValueError."""
+def comparable_form(kind: ScalarKind, value: JsonValue) -> str | Decimal | date:
     match kind:
         case "text":
             if isinstance(value, str):
@@ -83,7 +79,6 @@ def date_from(value: JsonValue) -> date | None:
 
 
 def check_expected(kind: Kind, expected: JsonValue) -> None:
-    """Raise ValueError when an expected value cannot be compared under its kind."""
     if expected is None:
         return
     if isinstance(kind, dict):
@@ -95,16 +90,12 @@ def check_expected(kind: Kind, expected: JsonValue) -> None:
             return
         raise ValueError(f"expected {show(expected)} is not an object")
     try:
-        parse_scalar(kind, expected)
+        comparable_form(kind, expected)
     except ValueError as error:
         raise ValueError(f"expected {show(expected)} is {error}") from None
 
 
 def differences(kind: Kind, expected: JsonValue, read: JsonValue) -> str | None:
-    """Return None when the read value equals the expected one, else the reason it does not.
-
-    The expected value has passed check_expected.
-    """
     if expected is None or read is None:
         if expected is None and read is None:
             return None
@@ -122,7 +113,7 @@ def differences(kind: Kind, expected: JsonValue, read: JsonValue) -> str | None:
 
 
 def same_scalar(kind: ScalarKind, expected: JsonValue, read: JsonValue) -> bool:
-    return parse_scalar(kind, expected) == parse_scalar(kind, read)
+    return comparable_form(kind, expected) == comparable_form(kind, read)
 
 
 def object_differences(

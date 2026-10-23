@@ -156,8 +156,6 @@ Assertion = Annotated[
 
 class Case(Shape):
     id: str
-    # None exactly when the project runs a command. Config.parts_fit_the_model
-    # keeps the pairing, so code that needs a prompt calls require_prompt.
     prompt: Prompt | None
     assertions: Annotated[tuple[Assertion, ...], Field(min_length=1)]
 

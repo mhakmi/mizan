@@ -16,7 +16,6 @@ def line(**keys):
 
 
 def child_program(tmp_path, lines, exit_status=0, before=""):
-    """Write a program that prints the lines and exits with the status, and return its argv."""
     (tmp_path / "child.py").write_text(
         f"import os, sys\n{before}\nfor line in {lines!r}:\n    print(line)\nsys.exit({exit_status})\n"
     )

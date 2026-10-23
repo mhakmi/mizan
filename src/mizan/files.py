@@ -116,10 +116,6 @@ def read_case_tables(path: Path) -> list[dict[str, Any]]:
 
 
 def read_folder_rows(folder: Path, kinds: Mapping[str, Kind]) -> list[dict[str, Any]]:
-    """Make one case for each <id>.expected.json in the folder, with one field-equals per key.
-
-    No other file in the folder is opened.
-    """
     if not folder.is_dir():
         raise ConfigError(f"The dataset folder {folder} does not exist.")
 

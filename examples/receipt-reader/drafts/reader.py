@@ -1,8 +1,3 @@
-"""A changed copy of ../reader.py, to show what the gate does with a wrong field.
-
-It reads an amount only up to its first comma, so 1,250.00 reads as 1.
-"""
-
 import json
 import sys
 from pathlib import Path
@@ -19,15 +14,19 @@ def read_receipt(text):
         elif label == "date":
             values["date"] = value
         elif label == "total":
-            values["total"] = read_money(value)
+            values["total"] = read_money_up_to_first_comma(value)
         elif label == "tip":
-            values["tip"] = read_money(value)
+            values["tip"] = read_money_up_to_first_comma(value)
     return values
 
 
-def read_money(text):
+def read_money_up_to_first_comma(text):
     amount, _, currency = text.partition(" ")
     return {"amount": amount.split(",")[0], "currency": currency or None}
+
+
+def word_count_as_tokens(text):
+    return len(text.split())
 
 
 def main():
@@ -42,8 +41,7 @@ def main():
                 "id": path.stem,
                 "output": read_receipt(text),
                 "error": None,
-                # A real reader would report the tokens its model call used.
-                "prompt_tokens": len(text.split()),
+                "prompt_tokens": word_count_as_tokens(text),
             }
         print(json.dumps(line))
 
