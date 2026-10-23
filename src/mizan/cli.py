@@ -7,7 +7,7 @@ from typing import assert_never
 
 from mizan.files import load_project, write_baseline, write_report
 from mizan.gate import baseline_from, evaluate
-from mizan.providers import connect, label
+from mizan.providers import connect, label, prepare_answers
 from mizan.report import render_text
 from mizan.runner import run_cases
 from mizan.types import (
@@ -70,14 +70,14 @@ def run_command(config_path: Path, system_prompt: Path | None, update_baseline: 
 
     project = load_project(config_path, system_prompt)
     config = project.config
-    complete = connect(config.model, project.config_dir)
+    answer = prepare_answers(project)
     ask_judge = None
     judge_label = None
     if config.judge is not None:
         ask_judge = connect(config.judge, project.config_dir)
         judge_label = label(config.judge)
 
-    results = run_cases(project.cases, complete, ask_judge, config.concurrency)
+    results = run_cases(project.cases, answer, ask_judge, config.concurrency)
     summary = RunSummary(model=label(config.model), judge=judge_label, results=results)
 
     baseline = None if update_baseline else project.baseline

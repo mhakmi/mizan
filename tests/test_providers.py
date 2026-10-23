@@ -6,6 +6,7 @@ import urllib.request
 import pytest
 
 from mizan import providers
+from mizan.files import load_project
 from mizan.providers import (
     FakeRule,
     anthropic_model,
@@ -15,6 +16,7 @@ from mizan.providers import (
     load_fake_rules,
     openai_model,
     post_json,
+    prepare_answers,
 )
 from mizan.types import AnthropicModel, ConfigError, FakeModel, OpenAIModel, Prompt, ProviderError
 
@@ -257,6 +259,23 @@ def test_a_fake_connects_from_its_replies_file(tmp_path):
     complete = connect(FakeModel(provider="fake", replies="model.toml"), tmp_path)
 
     assert complete(Prompt(system=None, user="Where is my order?")).text == "It has shipped."
+
+
+def test_a_failed_chat_answer_says_it_was_the_model_call(tmp_path):
+    (tmp_path / "mizan.toml").write_text(
+        'dataset = "cases.toml"\n'
+        '[prompt]\nuser = "user.md"\n'
+        '[model]\nprovider = "fake"\nreplies = "model.toml"\n'
+        '[[assert]]\ntype = "contains"\nvalue = "shipped"\n'
+    )
+    (tmp_path / "cases.toml").write_text('[[case]]\nid = "lost"\nquestion = "Where is it?"\n')
+    (tmp_path / "user.md").write_text("{{question}}")
+    (tmp_path / "model.toml").write_text('[[reply]]\nwhen = ["order"]\ntext = "It has shipped."\n')
+    project = load_project(tmp_path / "mizan.toml")
+    answer = prepare_answers(project)
+
+    with pytest.raises(ProviderError, match="^The model call failed. No rule in the fake"):
+        answer(project.cases[0])
 
 
 def test_a_replies_file_with_a_mistake_is_rejected_with_the_file_named(tmp_path):

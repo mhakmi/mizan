@@ -35,11 +35,13 @@ def load_project(config_path: Path, system_prompt_override: Path | None = None) 
         raise ConfigError(f"{config_path} is not a valid config.\n{explain(error)}") from error
 
     system_template = None
-    if system_prompt_override is not None:
-        system_template = read_text(system_prompt_override)
-    elif config.prompt.system is not None:
-        system_template = read_text(config_dir / config.prompt.system)
-    user_template = read_text(config_dir / config.prompt.user)
+    user_template = None
+    if config.prompt is not None:
+        if system_prompt_override is not None:
+            system_template = read_text(system_prompt_override)
+        elif config.prompt.system is not None:
+            system_template = read_text(config_dir / config.prompt.system)
+        user_template = read_text(config_dir / config.prompt.user)
 
     dataset_path = config_dir / config.dataset
     rows = read_toml(dataset_path).get("case", [])

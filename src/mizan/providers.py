@@ -10,9 +10,12 @@ from typing import Annotated, Any, assert_never
 
 from pydantic import BaseModel, Field, ValidationError
 
-from mizan.files import read_toml
+from mizan.files import Project, read_toml
 from mizan.types import (
+    Answer,
     AnthropicModel,
+    Case,
+    ChatModels,
     Complete,
     ConfigError,
     FakeModel,
@@ -36,7 +39,29 @@ ANTHROPIC_VERSION = "2023-06-01"
 ANTHROPIC_DEFAULT_MAX_TOKENS = 4096
 
 
-def connect(settings: ModelSettings, config_dir: Path) -> Complete:
+def prepare_answers(project: Project) -> Answer:
+    """Return the function that gives the reply for one case.
+
+    Raises ConfigError, before any case runs, when the model cannot be reached
+    at all, such as when its API key is missing.
+    """
+    settings = project.config.model
+    match settings:
+        case AnthropicModel() | OpenAIModel() | FakeModel():
+            complete = connect(settings, project.config_dir)
+
+            def answer(case: Case) -> Reply:
+                try:
+                    return complete(case.require_prompt())
+                except ProviderError as error:
+                    raise ProviderError(f"The model call failed. {error}") from error
+
+            return answer
+        case _:
+            assert_never(settings)
+
+
+def connect(settings: ChatModels, config_dir: Path) -> Complete:
     """Return the function that calls the configured model.
 
     Raises ConfigError when the API key is not in the environment, so a missing

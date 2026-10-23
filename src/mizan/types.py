@@ -1,11 +1,19 @@
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self, assert_never
 
 import jsonschema.validators
 from jsonschema.exceptions import SchemaError
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 
 class MizanError(Exception):
@@ -125,8 +133,17 @@ Assertion = Annotated[
 
 class Case(Shape):
     id: str
-    prompt: Prompt
+    # None exactly when the project runs a command. Config.parts_fit_the_model
+    # keeps the pairing, so code that needs a prompt calls require_prompt.
+    prompt: Prompt | None
     assertions: Annotated[tuple[Assertion, ...], Field(min_length=1)]
+
+    def require_prompt(self) -> Prompt:
+        assert self.prompt is not None, "only a chat project asks for a prompt"
+        return self.prompt
+
+
+Answer = Callable[[Case], Reply]
 
 
 class AssertionScore(Shape):
@@ -203,10 +220,9 @@ class FakeModel(Shape):
     replies: Path
 
 
-ModelSettings = Annotated[
-    AnthropicModel | OpenAIModel | FakeModel,
-    Field(discriminator="provider"),
-]
+ChatModels = AnthropicModel | OpenAIModel | FakeModel
+JudgeSettings = Annotated[ChatModels, Field(discriminator="provider")]
+ModelSettings = Annotated[ChatModels, Field(discriminator="provider")]
 
 
 class PromptFiles(Shape):
@@ -226,11 +242,21 @@ class Config(Shape):
     baseline: Path = Path("mizan.baseline.json")
     report: Path = Path("mizan-report.json")
     concurrency: Annotated[int, Field(ge=1)] = 4
-    prompt: PromptFiles
+    prompt: PromptFiles | None = None
     model: ModelSettings
-    judge: ModelSettings | None = None
+    judge: JudgeSettings | None = None
     gate: Gate = Gate()
     assertion_templates: tuple[dict[str, Any], ...] = Field(default=(), alias="assert")
+
+    @model_validator(mode="after")
+    def parts_fit_the_model(self) -> Self:
+        match self.model:
+            case AnthropicModel() | OpenAIModel() | FakeModel():
+                if self.prompt is None:
+                    raise ValueError(f'provider = "{self.model.provider}" needs a [prompt] table')
+            case _:
+                assert_never(self.model)
+        return self
 
 
 class CaseChange(Shape):

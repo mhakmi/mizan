@@ -157,6 +157,11 @@ def test_a_bad_regex_stops_the_load(project_dir):
         ("min_score = 0.8", "minimum = 0.8", "(?s)not a valid config.*gate.minimum"),
         ('provider = "fake"', 'provider = "bedrock"', "(?s)not a valid config.*model"),
         ('user = "prompts/user.md"', 'user = "prompts/gone.md"', "Could not read .*gone.md"),
+        (
+            '[prompt]\nsystem = "prompts/system.md"\nuser = "prompts/user.md"\n',
+            "",
+            r'(?s)not a valid config.*provider = "fake" needs a \[prompt\] table',
+        ),
     ],
     ids=[
         "missing dataset",
@@ -166,6 +171,7 @@ def test_a_bad_regex_stops_the_load(project_dir):
         "unknown key",
         "unknown provider",
         "missing prompt file",
+        "chat model without a prompt",
     ],
 )
 def test_a_config_mistake_is_reported_with_the_file_and_the_key(project_dir, old, new, message):

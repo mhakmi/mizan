@@ -25,7 +25,7 @@ def build_cases(
     rows: Sequence[Mapping[str, Any]],
     assertion_templates: Sequence[Mapping[str, Any]],
     system_template: str | None,
-    user_template: str,
+    user_template: str | None,
 ) -> tuple[Case, ...]:
     if not rows:
         raise ConfigError("The dataset has no cases.")
@@ -54,7 +54,7 @@ def build_case(
     row: Mapping[str, Any],
     assertion_templates: Sequence[Mapping[str, Any]],
     system_template: str | None,
-    user_template: str,
+    user_template: str | None,
 ) -> Case:
     variables = {}
     for name, value in row.items():
@@ -68,10 +68,12 @@ def build_case(
     if not isinstance(own_assertions, list):
         raise ConfigError('"assert" must be a list of tables.')
 
-    system = None
-    if system_template is not None:
-        system = render(system_template, variables)
-    prompt = Prompt(system=system, user=render(user_template, variables))
+    prompt = None
+    if user_template is not None:
+        system = None
+        if system_template is not None:
+            system = render(system_template, variables)
+        prompt = Prompt(system=system, user=render(user_template, variables))
 
     assertions = []
     for raw in [*assertion_templates, *own_assertions]:

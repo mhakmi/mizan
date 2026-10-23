@@ -89,7 +89,7 @@ def check_json(output: str, json_schema: dict[str, Any] | None) -> tuple[float, 
 
 
 def grade(rubric: str, case: Case, output: str, ask_judge: Complete) -> tuple[float, str]:
-    prompt = judge_prompt(case.prompt.user, output, rubric)
+    prompt = judge_prompt(case.require_prompt().user, output, rubric)
     try:
         reply = ask_judge(prompt)
     except ProviderError as error:

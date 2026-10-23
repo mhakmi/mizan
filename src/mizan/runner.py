@@ -2,27 +2,36 @@ from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 
 from mizan.assertions import check
-from mizan.types import Case, CaseResult, Complete, Errored, ProviderError, Scored, Unscorable
+from mizan.types import (
+    Answer,
+    Case,
+    CaseResult,
+    Complete,
+    Errored,
+    ProviderError,
+    Scored,
+    Unscorable,
+)
 
 
 def run_cases(
     cases: Sequence[Case],
-    complete: Complete,
+    answer: Answer,
     ask_judge: Complete | None,
     concurrency: int,
 ) -> tuple[CaseResult, ...]:
     def run_one(case: Case) -> CaseResult:
-        return run_case(case, complete, ask_judge)
+        return run_case(case, answer, ask_judge)
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         return tuple(pool.map(run_one, cases))
 
 
-def run_case(case: Case, complete: Complete, ask_judge: Complete | None) -> CaseResult:
+def run_case(case: Case, answer: Answer, ask_judge: Complete | None) -> CaseResult:
     try:
-        reply = complete(case.prompt)
+        reply = answer(case)
     except ProviderError as error:
-        return Errored(case_id=case.id, reason=f"The model call failed. {error}")
+        return Errored(case_id=case.id, reason=str(error))
 
     checks = []
     try:
