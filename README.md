@@ -1,4 +1,9 @@
-# Mizan
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/lockup-dark.svg">
+    <img src="assets/lockup-light.svg" alt="Mizan" width="248">
+  </picture>
+</h1>
 
 Mizan runs a dataset against a prompt, scores each answer, and exits non-zero when quality drops or the prompt goes over its token budget. Put it in a CI job and a bad prompt change fails the pull request.
 
